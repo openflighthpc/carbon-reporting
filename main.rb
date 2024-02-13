@@ -133,7 +133,6 @@ filtered = instances.select do |p|
   p.vcpu >= vcpus &&
     p.memory >= min_memory &&
     p.gpu >= gpus
-    p.name.count('.') == 1 # Don't look at archetypes with "elasticsearch", "cache", etc. in their name
 end
 
 mins = filtered.min(5) do |a,b|
