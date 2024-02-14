@@ -15,26 +15,55 @@ rescue Errno::ENOENT
   raise "File doesn't exist"
 end
 
-def print_usage!(server, count: 1)
-  lifetime = (server['usage']['hours_life_time'] / 24.0 / 365).ceil
-  puts "Lifetime: #{lifetime} years"
+def carbon_costs_per_year(server, use_ratio: 1, location: 'WOR')
+  # Boavizta expects the RAM entry to be an array, for some (no?) reason
+  server = server.dup.tap { |s| s['ram'] = [s['ram']] }
 
   response = boavizta.post('/v1/server/') do |req|
     req.headers[:content_type] = 'application/json'
     req.params[:verbose] = false
-    req.body = JSON.generate(server)
+    req.body = JSON.generate(
+      {
+        'configuration' => server,
+        'usage' => {
+          'use_time_ratio' => use_ratio,
+          'hours_life_time' => 8760,
+          'usage_location' => location
+        }
+      }
+    )
   end
 
   data = JSON.parse(response.body)
 
-  manufacture = data['impacts']['gwp']['embedded']['value'] * count
-  usage = data['impacts']['gwp']['use']['value']* count
+  {
+    manufacture: data.dig(*%w[impacts gwp embedded value]),
+    usage: data.dig(*%w[impacts gwp use value])
+  }
+end
 
+def print_usage!(cluster)
+  manufacture = 0
+  usage = 0
+  servers = cluster['configuration']
+
+  servers.each do |server|
+    costs = carbon_costs_per_year(
+      server,
+      use_ratio: cluster.dig('usage', 'use_time_ratio'),
+      location: cluster.dig('usage', 'usage_location')
+    )
+    manufacture += costs[:manufacture] * server['count']
+    usage += costs[:usage] * server['count']
+  end
   puts "Cluster manufacture cost: #{manufacture} kgCO2eq"
   puts "Cluster usage cost: #{usage} kgCO2eq"
 
   total = manufacture + usage
+  lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
   per_year = total / lifetime
+
+  puts "\nTotal cost: #{total} kgCO2eq"
   puts "Amortized cost: #{per_year} kgCO2eq per year"
 end
 
@@ -56,97 +85,113 @@ def query_cloud_cost(instance_type)
   end
 
   gwp = JSON.parse(response.body)['impacts']['gwp']
-  gwp['embedded']['value'] + gwp['use']['value']
-rescue JSON::ParserError => e
+
+  {
+    manufacture: gwp['embedded']['value'],
+    use: gwp['use']['value']
+  }
+rescue JSON::ParserError
   puts "failed to grab carbon cost for '#{instance_type}'"
-  return nil
+  nil
 end
 
 args = Hash[ARGV.join(' ').scan(/--?([^=\s]+)(?:=(\S+))?/)]
 
+Instance = Struct.new(:name, :vcpu, :memory, :gpu, :manu_cost, :usage_cost)
+
 BOAVIZTA_URL = ENV['BOAVIZTA_ENDPOINT_URL']
-PROVIDER_MAPPER = { aws: 'AWS', alces: 'Alces Cloud' }
+PROVIDER_MAPPER = { aws: 'AWS', alces: 'Alces Cloud' }.freeze
 PROVIDER = args['provider']
 PROVIDER_NAME = PROVIDER_MAPPER[PROVIDER.to_s.downcase.to_sym]
-SERVER = args['server']
+CLUSTER = args['cluster']
 
 raise "Provider '#{args['provider']}' doesn't exist" unless PROVIDER_NAME
-raise 'No server given' unless args['server']
+raise 'No cluster given' unless args['cluster']
 
+cluster = read_yaml(CLUSTER)
 
-server = read_yaml(SERVER)
-server_count = args['server-count']&.to_i || 1
+puts "On prem usage:\n"
+print_usage!(cluster)
+puts '---'
 
-puts "On prem usage:\n---"
-print_usage!(server, count: server_count)
+alces_cluster = cluster.dup
+alces_cluster['usage']['usage_location'] = 'SWE'
+alces_cluster['usage']['hours_life_time'] = 70_080
+puts "\nThe same system, but in Sweden over 8 years:\n"
+print_usage!(alces_cluster)
 puts
 
-server['usage']['usage_location'] = 'SWE'
-server['usage']['hours_life_time'] = 70_080
-puts "The same system, but in Sweden over 8 years:\n---"
-print_usage!(server, count: server_count)
-puts
-
-vcpus = 
-  (server.dig('configuration', 'cpu', 'core_units') || 1) *
-  (server.dig('configuration', 'cpu', 'units') || 1)
-gpus = server.dig('configuration', 'gpu', 'units') || 0
-min_memory = server['configuration']['ram'].map do |el|
-  el['units'].to_i * el['capacity'].to_i
-end.reduce(:+)
-
+servers = cluster['configuration']
 PROVIDER_INSTANCES_DATA = File.join(File.dirname(__FILE__), "#{PROVIDER}_instances.json")
+available_instances =
+  case File.file?(PROVIDER_INSTANCES_DATA)
+  when true
+    instance_hash = JSON.parse(File.read(PROVIDER_INSTANCES_DATA))
+    instance_hash.map do |i|
+      next unless i['manu_cost'] # Row is useless unless it has cost data
 
-Instance = Struct.new(:name, :vcpu, :memory, :gpu, :carbon_cost)
+      Instance.new(
+        i['name'],
+        i['vcpu'],
+        i['memory'],
+        i['gpu'],
+        i['manu_cost'],
+        i['usage_cost']
+      )
+    end.compact
+  else
+    puts 'Fetching instance types...'
+    instance_hash = list_instance_types(PROVIDER)
 
-instances = case File.file?(PROVIDER_INSTANCES_DATA)
-                when true
-                  instance_hash = JSON.load(File.read(PROVIDER_INSTANCES_DATA))
-                  instance_hash.map do |i|
-                    next unless i['carbon_cost']
-                    Instance.new(
-                      i['name'],
-                      i['vcpu'],
-                      i['memory'],
-                      i['gpu'],
-                      i['carbon_cost']
-                    )
-                  end.compact
-                else
-                  puts "Fetching instance types..."
-                  instance_hash = list_instance_types(PROVIDER)
+    instances = instance_hash.map do |k, i|
+      costs = query_cloud_cost(k)
+      next unless costs
 
-                  instances = instance_hash.map do |k,i|
-                    cost = query_cloud_cost(k)
-                    next unless cost
-                    Instance.new(
-                      k,
-                      i['vcpu']['default'].to_i,
-                      i['memory']['default'].to_i,
-                      i['gpu_units']['default'].to_i,
-                      cost
-                    )
-                  end.compact.tap do |is|
-                    File.open(PROVIDER_INSTANCES_DATA, 'w') { |f| f.write(is.map(&:to_h).to_json)}
-                  puts "Instance types cached at #{File.expand_path(PROVIDER_INSTANCES_DATA)}"
-                  end
-                end
-
-filtered = instances.select do |p|
-  p.vcpu >= vcpus &&
-    p.memory >= min_memory &&
-    p.gpu >= gpus
-end
-
-mins = filtered.min(5) do |a,b|
-  a.carbon_cost <=> b.carbon_cost
-end
+      Instance.new(
+        k,
+        i['vcpu']['default'].to_i,
+        i['memory']['default'].to_i,
+        i['gpu_units']['default'].to_i,
+        costs[:manufacture],
+        costs[:use]
+      )
+    end
+    instances.compact.tap do |is|
+      File.open(PROVIDER_INSTANCES_DATA, 'w') { |f| f.write(is.map(&:to_h).to_json) }
+      puts "Instance types cached at #{File.expand_path(PROVIDER_INSTANCES_DATA)}"
+    end
+  end
 
 puts "Best options on #{PROVIDER_NAME}:\n---"
-mins.each do |instance|
-  puts "#{instance.name}"
-  puts "vCPUs: #{instance.vcpu}"
-  puts "GPUs: #{instance.gpu}"
-  puts "Memory: #{instance.memory}"
-  puts "Yearly carbon cost for #{server_count} of them: #{instance.carbon_cost * server_count} kgCO2eq\n\n"
+servers.each do |server|
+  vcpus =
+    (server.dig('cpu', 'core_units') || 1) *
+    (server.dig('cpu', 'units') || 1)
+  gpus = server.dig('gpu', 'units') || 0
+  min_memory = server.dig('ram', 'units') * server.dig('ram', 'capacity')
+
+  filtered = available_instances.select do |p|
+    p.vcpu >= vcpus &&
+      p.memory >= min_memory &&
+      p.gpu >= gpus
+  end
+
+  mins = filtered.min(1) do |a, b|
+    (a.manu_cost + a.usage_cost) <=> (b.manu_cost + b.usage_cost)
+  end
+
+  mins.each do |instance|
+    manufacture = instance.manu_cost
+    usage = instance.usage_cost
+
+    total = manufacture + usage
+
+    puts instance.name
+    puts "vCPUs: #{instance.vcpu}"
+    puts "GPUs: #{instance.gpu}"
+    puts "Memory: #{instance.memory}"
+    puts "Manufacture cost: #{manufacture} kgCO2eq"
+    puts "Usage cost: #{usage} kgCO2eq"
+    puts "Yearly carbon cost for #{server['count']} of them: #{total * server['count']} kgCO2eq\n\n"
+  end
 end
