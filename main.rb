@@ -5,15 +5,6 @@ require 'faraday_middleware'
 require 'json'
 require 'fileutils'
 
-args = Hash[ARGV.join(' ').scan(/--?([^=\s]+)(?:=(\S+))?/)]
-
-BOAVIZTA_URL = ENV['BOAVIZTA_ENDPOINT_URL']
-PROVIDER = args['provider']
-SERVER = args['server']
-raise "No provider given" unless PROVIDER
-raise 'No server given' unless args['server']
-
-
 def boavizta
   @boavizta ||= Faraday.new(BOAVIZTA_URL)
 end
@@ -70,6 +61,18 @@ rescue JSON::ParserError => e
   puts "failed to grab carbon cost for '#{instance_type}'"
   return nil
 end
+
+args = Hash[ARGV.join(' ').scan(/--?([^=\s]+)(?:=(\S+))?/)]
+
+BOAVIZTA_URL = ENV['BOAVIZTA_ENDPOINT_URL']
+PROVIDER_MAPPER = { aws: 'AWS', alces: 'Alces Cloud' }
+PROVIDER = args['provider']
+PROVIDER_NAME = PROVIDER_MAPPER[PROVIDER.to_s.downcase.to_sym]
+SERVER = args['server']
+
+raise "Provider '#{args['provider']}' doesn't exist" unless PROVIDER_NAME
+raise 'No server given' unless args['server']
+
 
 server = read_yaml(SERVER)
 server_count = args['server-count']&.to_i || 1
@@ -139,7 +142,7 @@ mins = filtered.min(5) do |a,b|
   a.carbon_cost <=> b.carbon_cost
 end
 
-puts "Best options on AWS:\n---"
+puts "Best options on #{PROVIDER_NAME}:\n---"
 mins.each do |instance|
   puts "#{instance.name}"
   puts "vCPUs: #{instance.vcpu}"
