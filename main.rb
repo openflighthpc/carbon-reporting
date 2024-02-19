@@ -58,15 +58,12 @@ def print_usage!(cluster)
     manufacture += costs[:manufacture] * server['count']
     usage += costs[:usage] * server['count']
   end
-  puts "Cluster manufacture cost: #{manufacture} kgCO2eq"
-  puts "Cluster usage cost: #{usage} kgCO2eq"
 
   total = manufacture + usage
   lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
   per_year = total / lifetime
 
-  puts "\nTotal cost: #{total} kgCO2eq"
-  puts "Amortized cost: #{per_year} kgCO2eq per year"
+  puts "Amortized carbon equivalent: #{per_year} kgCO2eq per year"
 end
 
 def list_instance_types(provider)
@@ -90,7 +87,7 @@ def query_cloud_cost(instance_type, provider)
 
   { manufacture: gwp['embedded']['value'], use: gwp['use']['value'] }
 rescue JSON::ParserError
-  puts "failed to grab carbon cost for '#{instance_type}'" if ARGS['verbose']
+  puts "failed to grab carbon emission value for '#{instance_type}'" if ARGS['verbose']
   nil
 end
 
@@ -134,6 +131,9 @@ def fetch_instance_list(provider)
   end
 end
 
+def bold(str)
+  "\e[1m#{str}\e[22m"
+end
 
 Instance = Struct.new(:name, :vcpu, :memory, :gpu, :manu_cost, :usage_cost)
 
@@ -154,14 +154,14 @@ raise 'No cluster given' unless ARGS['cluster']
 
 cluster = read_yaml(CLUSTER_FILE)
 
-puts "On prem usage:\n"
+puts bold("On prem usage:\n---")
 print_usage!(cluster)
-puts '---'
 
-alces_cluster = cluster.dup
+# Deep copy so we can change new cluster without updating main one
+alces_cluster = Marshal.load(Marshal.dump(cluster))
 alces_cluster['usage']['usage_location'] = 'SWE'
 alces_cluster['usage']['hours_life_time'] = 70_080
-puts "\nThe same system, but in Sweden over 8 years:\n"
+puts bold("\nThe same system, but in Sweden over 8 years:\n---")
 print_usage!(alces_cluster)
 puts
 
@@ -169,7 +169,8 @@ servers = cluster['configuration']
 
 PROVIDERS.each do |provider|
   available_instances = fetch_instance_list(provider[:id])
-  puts "Best options on #{provider[:name]}\n---"
+  puts bold("Best options on #{provider[:name]}\n---")
+  total = 0
 
   servers.each do |server|
     vcpus = (server.dig('cpu', 'core_units') || 1) * (server.dig('cpu', 'units') || 1)
@@ -187,19 +188,14 @@ PROVIDERS.each do |provider|
     mins.each do |instance|
       manufacture = instance.manu_cost
       usage = instance.usage_cost
-
-      total = (manufacture + usage) * server['count']
-      lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
-      per_year = total / lifetime
-
-      puts instance.name
-      puts "vCPUs: #{instance.vcpu}"
-      puts "GPUs: #{instance.gpu}"
-      puts "Memory: #{instance.memory}"
-      puts "Manufacture cost: #{manufacture} kgCO2eq"
-      puts "Usage cost: #{usage} kgCO2eq"
-      puts "Total cost over 5 years for #{server['count']} of them: #{total} kgCO2eq"
-      puts "Amortized cost: #{per_year} kgCO2eq per year\n\n"
+      total += (manufacture + usage) * server['count']
     end
   end
+
+  lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
+  amortized = total / lifetime
+  puts "Amortized carbon equivalent: #{amortized} kgCO2eq per year\n\n"
 end
+
+
+
