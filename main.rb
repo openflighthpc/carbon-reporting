@@ -15,23 +15,40 @@ rescue Errno::ENOENT
   raise "File doesn't exist"
 end
 
-def carbon_costs_per_year(server, use_ratio: 1, location: 'WOR')
+def carbon_costs_per_year(server, use_ratio: 1, location: 'WOR', use_archs: false)
   # Boavizta expects the RAM entry to be an array, for some (no?) reason
-  server = server.dup.tap { |s| s['ram'] = [s['ram']] }
-
-  response = boavizta.post('/v1/server/') do |req|
-    req.headers[:content_type] = 'application/json'
-    req.params[:verbose] = false
-    req.body = JSON.generate(
-      {
-        'configuration' => server,
-        'usage' => {
-          'use_time_ratio' => use_ratio,
-          'hours_life_time' => 8760,
-          'usage_location' => location
+  if use_archs
+    response = boavizta.post('/v1/server/') do |req|
+      req.headers[:content_type] = 'application/json'
+      req.params[:verbose] = false
+      req.params[:server] = server['name']
+      req.body = JSON.generate(
+        {
+          'usage' => {
+            'use_time_ratio' => use_ratio,
+            'hours_life_time' => 8760,
+            'usage_location' => location
+          }
         }
-      }
-    )
+      )
+    end
+  else
+    server = server.dup.tap { |s| s['ram'] = [s['ram']] }
+
+    response = boavizta.post('/v1/server/') do |req|
+      req.headers[:content_type] = 'application/json'
+      req.params[:verbose] = false
+      req.body = JSON.generate(
+        {
+          'configuration' => server,
+          'usage' => {
+            'use_time_ratio' => use_ratio,
+            'hours_life_time' => 8760,
+            'usage_location' => location
+          }
+        }
+      )
+    end
   end
 
   data = JSON.parse(response.body)
@@ -42,7 +59,7 @@ def carbon_costs_per_year(server, use_ratio: 1, location: 'WOR')
   }
 end
 
-def print_usage!(cluster)
+def print_usage!(cluster, use_archs: false)
   manufacture = 0
   usage = 0
   servers = cluster['configuration']
@@ -51,7 +68,8 @@ def print_usage!(cluster)
     costs = carbon_costs_per_year(
       server,
       use_ratio: cluster.dig('usage', 'use_time_ratio'),
-      location: cluster.dig('usage', 'usage_location')
+      location: cluster.dig('usage', 'usage_location'),
+      use_archs: use_archs
     )
     manufacture += costs[:manufacture] * server['count']
     usage += costs[:usage] * server['count']
@@ -104,6 +122,7 @@ PROVIDER_MAPPER = { aws: 'AWS', alces: 'Alces Cloud' }.freeze
 PROVIDER = args['provider']
 PROVIDER_NAME = PROVIDER_MAPPER[PROVIDER.to_s.downcase.to_sym]
 CLUSTER = args['cluster']
+USE_ARCHS = args['use_archs']=='true'
 
 raise "Provider '#{args['provider']}' doesn't exist" unless PROVIDER_NAME
 raise 'No cluster given' unless args['cluster']
@@ -111,14 +130,14 @@ raise 'No cluster given' unless args['cluster']
 cluster = read_yaml(CLUSTER)
 
 puts "On prem usage:\n"
-print_usage!(cluster)
+print_usage!(cluster, use_archs: USE_ARCHS)
 puts '---'
 
 alces_cluster = cluster.dup
 alces_cluster['usage']['usage_location'] = 'SWE'
 alces_cluster['usage']['hours_life_time'] = 70_080
 puts "\nThe same system, but in Sweden over 8 years:\n"
-print_usage!(alces_cluster)
+print_usage!(alces_cluster, use_archs: USE_ARCHS)
 puts
 
 servers = cluster['configuration']
@@ -164,11 +183,27 @@ available_instances =
 
 puts "Best options on #{PROVIDER_NAME}:\n---"
 servers.each do |server|
-  vcpus =
-    (server.dig('cpu', 'core_units') || 1) *
-    (server.dig('cpu', 'units') || 1)
-  gpus = server.dig('gpu', 'units') || 0
-  min_memory = server.dig('ram', 'units') * server.dig('ram', 'capacity')
+  if USE_ARCHS
+    response = boavizta.get('/v1/server/archetype_config') do |req|
+      req.headers[:content_type] = 'application/json'
+      req.params[:verbose] = false
+      req.params[:archetype] = server['name']
+    end
+    data = JSON.parse(response.body)
+    vcpus =
+      (data.dig('CPU', 'core_units', 'default') || 1) *
+      (data.dig('CPU', 'units', 'default') || 1)
+    gpus = data.dig('GPU', 'units', 'default')
+    min_memory =
+      data.dig('RAM', 'units', 'default') *
+      data.dig('RAM', 'capacity', 'default')
+  else
+    vcpus =
+      (server.dig('cpu', 'core_units') || 1) *
+      (server.dig('cpu', 'units') || 1)
+    gpus = server.dig('gpu', 'units') || 0
+    min_memory = server.dig('ram', 'units') * server.dig('ram', 'capacity')
+  end
 
   filtered = available_instances.select do |p|
     p.vcpu >= vcpus &&
