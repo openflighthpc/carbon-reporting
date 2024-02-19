@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 require 'yaml'
-require 'faraday_middleware'
+require 'faraday'
 require 'json'
 require 'fileutils'
 

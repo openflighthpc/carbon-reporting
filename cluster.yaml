@@ -1,0 +1,30 @@
+---
+configuration:
+  - cpu:
+      units: 4
+      core_units: 24
+      tdp: 150
+      family: Milan
+    gpu:
+      units: 0
+    ram:
+      units: 4
+      capacity: 32
+      manufacturer: Samsung
+    count: 2
+  - cpu:
+      units: 2
+      core_units: 4
+      tdp: 150
+      family: Milan
+    gpu:
+      units: 4
+    ram:
+      units: 2
+      capacity: 32
+      manufacturer: Samsung
+    count: 3
+usage:
+  use_time_ratio: 1
+  hours_life_time: 43800
+  usage_location: WOR
