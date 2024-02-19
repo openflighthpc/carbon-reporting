@@ -2,5 +2,5 @@
 
 - Update endpoint URL in `env.sh`
 - Source `env.sh`
-- Run `main.sh` with `provider` and `server` options
+- Run `main.sh` with `provider` and `cluster` options
 
