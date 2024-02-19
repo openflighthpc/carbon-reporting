@@ -169,8 +169,8 @@ servers = cluster['configuration']
 
 PROVIDERS.each do |provider|
   available_instances = fetch_instance_list(provider[:id])
-  puts bold("Best options on #{provider[:name]}\n---")
   total = 0
+  types_used = []
 
   servers.each do |server|
     vcpus = (server.dig('cpu', 'core_units') || 1) * (server.dig('cpu', 'units') || 1)
@@ -181,19 +181,23 @@ PROVIDERS.each do |provider|
       p.vcpu >= vcpus && p.memory >= min_memory && p.gpu >= gpus
     end
 
-    mins = filtered.min(1) do |a, b|
+    min = filtered.min do |a, b|
       (a.manu_cost + a.usage_cost) <=> (b.manu_cost + b.usage_cost)
     end
 
-    mins.each do |instance|
-      manufacture = instance.manu_cost
-      usage = instance.usage_cost
-      total += (manufacture + usage) * server['count']
-    end
+    next unless min
+
+    types_used << { name: min.name, count: server['count'] }
+    manufacture = min.manu_cost
+    usage = min.usage_cost
+    total += (manufacture + usage) * server['count']
   end
 
   lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
   amortized = total / lifetime
+  puts bold("Best options on #{provider[:name]}\n---")
+  instances = types_used.map { |t| "#{t[:count]}x #{t[:name]}" }
+  puts "Instances used: #{instances.join(', ')}"
   puts "Amortized carbon equivalent: #{amortized} kgCO2eq per year\n\n"
 end
 
