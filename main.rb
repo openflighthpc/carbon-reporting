@@ -156,12 +156,13 @@ cluster = read_yaml(CLUSTER_FILE)
 
 puts bold("On prem usage:\n---")
 print_usage!(cluster)
+puts
 
 # Deep copy so we can change new cluster without updating main one
 alces_cluster = Marshal.load(Marshal.dump(cluster))
 alces_cluster['usage']['usage_location'] = 'SWE'
 alces_cluster['usage']['hours_life_time'] = 70_080
-puts bold("\nThe same system, but in Sweden over 8 years:\n---")
+puts bold("The same system, but in Sweden over 8 years:\n---")
 print_usage!(alces_cluster)
 puts
 
@@ -177,8 +178,19 @@ PROVIDERS.each do |provider|
     gpus = server.dig('gpu', 'units') || 0
     min_memory = server.dig('ram', 'units') * server.dig('ram', 'capacity')
 
-    filtered = available_instances.select do |p|
-      p.vcpu >= vcpus && p.memory >= min_memory && p.gpu >= gpus
+    count = 1
+    filtered = []
+
+    loop do
+      filtered = available_instances.select do |p|
+        (p.vcpu * count) >= vcpus &&
+          (p.memory * count) >= min_memory &&
+          (p.gpu * count) >= gpus
+      end
+
+      break if filtered.any?
+
+      count += 1
     end
 
     min = filtered.min do |a, b|
@@ -187,10 +199,11 @@ PROVIDERS.each do |provider|
 
     next unless min
 
-    types_used << { name: min.name, count: server['count'] }
+    used = server['count'] * count
+    types_used << { name: min.name, count: used }
     manufacture = min.manu_cost
     usage = min.usage_cost
-    total += (manufacture + usage) * server['count']
+    total += (manufacture + usage) * used
   end
 
   lifetime = (cluster['usage']['hours_life_time'] / 24.0 / 365).ceil
@@ -200,6 +213,3 @@ PROVIDERS.each do |provider|
   puts "Instances used: #{instances.join(', ')}"
   puts "Amortized carbon equivalent: #{amortized} kgCO2eq per year\n\n"
 end
-
-
-
