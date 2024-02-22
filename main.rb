@@ -24,11 +24,12 @@ def generate_server(server)
   end
   data = JSON.parse(response.body)
 
-  if data.dig('CPU', 'name', 'default')
+  cpu_name = server.dig('cpu', 'name') || data.dig('CPU', 'name', 'default')
+  if cpu_name
     response = boavizta.get('/v1/utils/name_to_cpu') do |req|
       req.headers[:content_type] = 'application/json'
       req.params[:verbose] = false
-      req.params[:cpu_name] = data.dig('CPU', 'name', 'default')
+      req.params[:cpu_name] = cpu_name
     end
     cpu_data = JSON.parse(response.body)
   end
@@ -39,9 +40,9 @@ def generate_server(server)
       'core_units' => server.dig('cpu', 'core_units') ||
                       data.dig('CPU', 'core_units', 'default') ||
                       cpu_data.dig('core_units'),
-      'tdp' => cpu_data.dig('tdp'),
-      'name' => cpu_data.dig('name'),
-      'family' => cpu_data.dig('family')
+      'tdp' => server.dig('cpu', 'tdp') || cpu_data.dig('tdp'),
+      'name' => cpu_name,
+      'family' => server.dig('cpu', 'family') || cpu_data.dig('family')
       },
     'gpu' => {
       'units' => server.dig('gpu', 'units') || data.dig('GPU', 'units', 'default')
@@ -50,7 +51,7 @@ def generate_server(server)
       'units' => server.dig('ram', 'units') || data.dig('RAM', 'units', 'default'),
       'capacity' => server.dig('ram', 'capacity') || data.dig('RAM', 'capacity', 'default')
       },
-    'count' => server['count']
+    'count' => server['count'] || 1
   }
 end
 

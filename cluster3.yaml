@@ -6,8 +6,15 @@ configuration:
     ram:
       units: 16
     count: 1
-  - name: u-6tb1.metal
-    count: 1
+  - cpu:
+      name: AMD A10-9700
+    gpu:
+      units: 4
+    ram:
+      units: 2
+      capacity: 32
+      manufacturer: Samsung
+    count: 3
 usage:
   use_time_ratio: 1
   hours_life_time: 43800
