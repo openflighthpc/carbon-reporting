@@ -1,0 +1,14 @@
+---
+configuration:
+  - name: a1.metal
+    cpu:
+      units: 64
+    ram:
+      units: 16
+    count: 1
+  - name: u-6tb1.metal
+    count: 1
+usage:
+  use_time_ratio: 1
+  hours_life_time: 43800
+  usage_location: WOR
