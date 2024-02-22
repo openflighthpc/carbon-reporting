@@ -211,5 +211,5 @@ PROVIDERS.each do |provider|
   puts bold("Best options on #{provider[:name]}\n---")
   instances = types_used.map { |t| "#{t[:count]}x #{t[:name]}" }
   puts "Instances used: #{instances.join(', ')}"
-  puts "Amortized carbon equivalent: #{amortized} kgCO2eq per year\n\n"
+  puts "Amortized carbon equivalent: #{amortized.round(2)} kgCO2eq per year\n\n"
 end
