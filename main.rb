@@ -36,7 +36,7 @@ def generate_server(server)
 
   {
     'cpu' => {
-      'units' => server.dig('cpu', 'units') || data.dig('CPU', 'units', 'default'),
+      'units' => server.dig('cpu', 'units') || data.dig('CPU', 'units', 'default') || 1,
       'core_units' => server.dig('cpu', 'core_units') ||
                       data.dig('CPU', 'core_units', 'default') ||
                       cpu_data.dig('core_units'),
