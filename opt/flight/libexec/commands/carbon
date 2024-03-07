@@ -9,6 +9,7 @@
 action=$1
 
 LOG_DIR="$flight_ROOT/var/log/carbon"
+GATHER_COMMAND="flight gather"
 
 # Exit if no jq
 if ! which jq >/dev/null 2>&1 ; then
@@ -44,7 +45,7 @@ fi
 # - Number of PSUs - Not sure how this could possibly be worked out for VMs, potentially with IPMI on hardware
 # - Number of GPUs - Not yet supported in Boavizta
 
-PLATFORM=$(flight gather show .platform --force)
+PLATFORM=$($GATHER_COMMAND show .platform --force)
 
 ## Determine if AWS or Alces Cloud instance (makes life much easier if it is)
 if [[ $PLATFORM == "AWS"  ]] || [[ $PLATFORM == "Alces Cloud" ]] ; then
@@ -54,19 +55,19 @@ fi
 
 ## Figure system info out
 # Grab some data from gather
-NUMCPUS=$(flight gather show .cpus.units)
-NUMCORESPERCPU=$(flight gather show .cpus.cores_per_cpu)
-CPUMODEL=$(flight gather show .cpus.cpu_data.[CPU0].model)
+NUMCPUS=$($GATHER_COMMAND show .cpus.units)
+NUMCORESPERCPU=$($GATHER_COMMAND show .cpus.cores_per_cpu)
+CPUMODEL=$($GATHER_COMMAND show .cpus.cpu_data.[CPU0].model)
 
 # Memory distribution
-NUMDIMMS=$(flight gather show .ram.units)
-GBPERDIMM=$(fligt gather show .ram.capacity_per_unit)
+NUMDIMMS=$($GATHER_COMMAND show .ram.units)
+GBPERDIMM=$($GATHER_COMMAND show .ram.capacity_per_unit)
 
 # Disks
 disks=$(ls /sys/block)
 for disk in $disks ; do
-	size=$(flight gather show .disks.[$disk].size)
-	disktype=$(flight gather show .disks.[$disk].type)
+	size=$($GATHER_COMMAND show .disks.[$disk].size)
+	disktype=$($GATHER_COMMAND show .disks.[$disk].type)
 	DISKSJSON="{\"units\": 1, \"type\": \"$disktype\", \"capacity\": $size},$DISKSJSON"
 	DISKSINFO="${size}GB $disktype, $DISKSINFO"
 done
