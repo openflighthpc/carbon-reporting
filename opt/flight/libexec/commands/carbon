@@ -17,8 +17,13 @@ if ! which jq >/dev/null 2>&1 ; then
     exit 1
 fi
 
+if ! command -v bc &> /dev/null ; then
+    echo "Cannot find 'bc', this is required for the program to function"
+    exit 1
+fi
+
 # Exit if no Gather
-if !(rpm -qa |grep flight-gather -q) ; then
+if ! command -v $GATHER_COMMAND &> /dev/null ; then
     echo "Cannot find Gather. Gather is required for the program to function"
     exit 1
 fi
