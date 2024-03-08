@@ -53,11 +53,21 @@ fi
 
 PLATFORM=$($GATHER_COMMAND show .platform --force)
 
-## Determine if AWS or Alces Cloud instance (makes life much easier if it is)
-if [[ $PLATFORM == "AWS"  ]] || [[ $PLATFORM == "Alces Cloud" ]] ; then
-    INSTANCE_TYPE=$(curl -s --fail http://169.254.169.254/latest/meta-data/instance-type)
-    USE_INSTANCE_TYPE=true
-fi
+## Determine cloud instance and provider
+CLOUD_PROVIDER=aws
+INSTANCE_TYPE=$(curl -s --fail http://169.254.169.254/latest/meta-data/instance-type)
+PROVIDERS=$(echo $(curl -s -X 'GET' \
+  "${BOAVIZTA_URL}/v1/cloud/instance/all_providers" \
+  -H 'accept: application/json') | jq .[] | tr -d '"')
+for provider in $PROVIDERS ; do
+	ARCHETYPES=$(curl -s -X 'GET' \
+	  "${BOAVIZTA_URL}/v1/cloud/instance/all_instances?provider=${provider}" \
+	  -H 'accept: application/json')
+	if echo $ARCHETYPES | jq -e ".|any(. == \"$INSTANCE_TYPE\")" &> /dev/null ; then
+		CLOUD_PROVIDER=$provider
+		USE_INSTANCE_TYPE=true
+	fi
+done
 
 ## Figure system info out
 # Grab some data from gather
@@ -219,7 +229,7 @@ AVERAGELOAD=$(curl -s -X 'POST' \
 if [ ! -z $USE_INSTANCE_TYPE ] ; then
 
 NOLOADINSTANCEREQUEST="{
-\"provider\": \"aws\",
+\"provider\": \"$CLOUD_PROVIDER\",
 \"instance_type\": \"$INSTANCE_TYPE\",
 \"usage\" : {
   \"usage_location\": \"GBR\",
@@ -233,7 +243,7 @@ NOLOADINSTANCEREQUEST="{
 }
 "
 HALFLOADINSTANCEREQUEST="{
-\"provider\": \"aws\",
+\"provider\": \"$CLOUD_PROVIDER\",
 \"instance_type\": \"$INSTANCE_TYPE\",
 \"usage\" : {
   \"usage_location\": \"GBR\",
@@ -248,7 +258,7 @@ HALFLOADINSTANCEREQUEST="{
 "
 
 FULLLOADINSTANCEREQUEST="{
-\"provider\": \"aws\",
+\"provider\": \"$CLOUD_PROVIDER\",
 \"instance_type\": \"$INSTANCE_TYPE\",
 \"usage\" : {
   \"usage_location\": \"GBR\",
@@ -263,7 +273,7 @@ FULLLOADINSTANCEREQUEST="{
 "
 
 AVERAGELOADINSTANCEREQUEST="{
-\"provider\": \"aws\",
+\"provider\": \"$CLOUD_PROVIDER\",
 \"instance_type\": \"$INSTANCE_TYPE\",
 \"usage\" : {
   \"usage_location\": \"GBR\",
