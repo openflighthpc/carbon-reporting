@@ -10,6 +10,7 @@ action=$1
 
 LOG_DIR="$flight_ROOT/var/log/carbon"
 GATHER_COMMAND="flight gather"
+BOAVIZTA_URL="https://api.boavizta.org"
 
 # Exit if no jq
 if ! which jq >/dev/null 2>&1 ; then
@@ -87,7 +88,7 @@ case $PLATFORM in
         elif [[ "$country" == "United States of America" ]] ; then
             country="United States"
         fi
-        LOCATION=$(curl -s https://api.boavizta.org/v1/utils/country_code |sed "s/.*$country\":\"//g;s/\".*//g")
+        LOCATION=$(curl -s ${BOAVIZTA_URL}/v1/utils/country_code |sed "s/.*$country\":\"//g;s/\".*//g")
         ;;
     "Azure")
         LOCATION=$()
@@ -183,25 +184,25 @@ AVERAGELOADREQUEST="$BASEREQUEST
 #
 
 NOLOAD=$(curl -s -X 'POST' \
-  'https://api.boavizta.org/v1/server/?verbose=false&criteria=gwp' \
+  "${BOAVIZTA_URL}/v1/server/?verbose=false&criteria=gwp" \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d "$NOLOADREQUEST" |jq '.impacts.gwp.use.value')
 
 HALFLOAD=$(curl -s -X 'POST' \
-  'https://api.boavizta.org/v1/server/?verbose=false&criteria=gwp' \
+  "${BOAVIZTA_URL}/v1/server/?verbose=false&criteria=gwp" \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d "$HALFLOADREQUEST" |jq '.impacts.gwp.use.value')
 
 FULLLOAD=$(curl -s -X 'POST' \
-  'https://api.boavizta.org/v1/server/?verbose=false&criteria=gwp' \
+  "${BOAVIZTA_URL}/v1/server/?verbose=false&criteria=gwp" \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d "$FULLLOADREQUEST" |jq '.impacts.gwp.use.value')
 
 AVERAGELOAD=$(curl -s -X 'POST' \
-  'https://api.boavizta.org/v1/server/?verbose=false&criteria=gwp' \
+  "${BOAVIZTA_URL}/v1/server/?verbose=false&criteria=gwp" \
   -H 'accept: application/json' \
   -H 'Content-Type: application/json' \
   -d "$AVERAGELOADREQUEST" |jq '.impacts.gwp.use.value')
@@ -276,10 +277,10 @@ AVERAGELOADINSTANCEREQUEST="{
 }
 "
 
-NOLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' 'https://api.boavizta.org/v1/cloud/instance?verbose=false&criteria=gwp' -H 'Content-Type: application/json' -d "$NOLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
-HALFLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' 'https://api.boavizta.org/v1/cloud/instance?verbose=false&criteria=gwp' -H 'Content-Type: application/json' -d "$HALFLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
-FULLLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' 'https://api.boavizta.org/v1/cloud/instance?verbose=false&criteria=gwp' -H 'Content-Type: application/json' -d "$FULLLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
-AVERAGELOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' 'https://api.boavizta.org/v1/cloud/instance?verbose=false&criteria=gwp' -H 'Content-Type: application/json' -d "$AVERAGELOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
+NOLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' "${BOAVIZTA_URL}/v1/cloud/instance?verbose=false&criteria=gwp" -H 'Content-Type: application/json' -d "$NOLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
+HALFLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' "${BOAVIZTA_URL}/v1/cloud/instance?verbose=false&criteria=gwp" -H 'Content-Type: application/json' -d "$HALFLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
+FULLLOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' "${BOAVIZTA_URL}/v1/cloud/instance?verbose=false&criteria=gwp" -H 'Content-Type: application/json' -d "$FULLLOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
+AVERAGELOADINSTANCE="$(curl -s -X 'POST' -H 'accept: application/json' "${BOAVIZTA_URL}/v1/cloud/instance?verbose=false&criteria=gwp" -H 'Content-Type: application/json' -d "$AVERAGELOADINSTANCEREQUEST" |jq '.impacts.gwp.use.value')"
 
 NOLOADAVG=$(echo "print(round(($NOLOAD+$NOLOADINSTANCE)/2,4))" |python)
 HALFLOADAVG=$(echo "print(round(($HALFLOAD+$HALFLOADINSTANCE)/2,4))" |python)
