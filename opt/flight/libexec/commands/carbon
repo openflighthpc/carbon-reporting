@@ -396,7 +396,7 @@ Half Load: ${HALFLOAD}kgCO2eq/hr
 
 Full Load: ${FULLLOAD}kgCO2eq/hr
 
-Average Load: ${AVERAGELOAD}kgCO2eq/hr
+Average Load (past 15mins): ${AVERAGELOAD}kgCO2eq/hr
 
 EOF
 
@@ -411,7 +411,7 @@ Half Load: ${HALFLOADINSTANCE}kgCO2eq/hr
 
 Full Load: ${FULLLOADINSTANCE}kgCO2eq/hr
 
-Average Load: ${AVERAGELOADINSTANCE}kgCO2eq/hr
+Average Load (past 15mins): ${AVERAGELOADINSTANCE}kgCO2eq/hr
 
 ## Combined Carbon Consumption Estimate (Average of Previous 2 Estimates)
 
@@ -421,7 +421,7 @@ Half Load: $(echo "print(round(($HALFLOAD+$HALFLOADINSTANCE)/2,4))"  |python)kgC
 
 Full Load: $(echo "print(round(($FULLLOAD+$FULLLOADINSTANCE)/2,4))"  |python)kgCO2eq/hr
 
-Average Load: $(echo "print(round(($AVERAGELOAD+$AVERAGELOADINSTANCE)/2,4))"  |python)kgCO2eq/hr
+Average Load (past 15mins): $(echo "print(round(($AVERAGELOAD+$AVERAGELOADINSTANCE)/2,4))"  |python)kgCO2eq/hr
 EOF
   fi
 
