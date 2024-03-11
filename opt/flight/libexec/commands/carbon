@@ -179,6 +179,10 @@ FULLLOADREQUEST="$BASEREQUEST
 load_avg_15min=$(uptime| awk -F'load average: ' '{print $2}' | cut -d ',' -f3 | tr -d ' ')
 percentage_15min=$(echo "scale=2; ($load_avg_15min / $(nproc)) * 100" | bc)
 
+if (( $(echo "$percentage_15min > 100.00" |bc -l) )); then
+  percentage_15min=100.00
+fi
+
 AVERAGELOADREQUEST="$BASEREQUEST
   \"usage\": {
     \"usage_location\": \"$LOCATION\",
