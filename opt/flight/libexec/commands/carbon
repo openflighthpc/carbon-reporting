@@ -419,6 +419,7 @@ EOF
     cat << EOF >> $LOG_DIR/report.md
 
 ## Estimated Carbon Consumption (From Instance Type)
+### Detected instance type is '${INSTANCE_TYPE}' on ${PLATFORM}
 
 No Load: ${NOLOADINSTANCE}kgCO2eq/hr
 
@@ -465,16 +466,32 @@ case $action in
 EOF
     ;;
   "min")
-    echo $NOLOAD
+    if [ ! -z $USE_INSTANCE_TYPE ] ; then
+     	echo $NOLOADINSTANCE
+    else
+		echo $NOLOAD
+    fi
     ;;
   "half")
-    echo $HALFLOAD
+    if [ ! -z $USE_INSTANCE_TYPE ] ; then
+     	echo $HALFLOADINSTANCE
+    else
+		echo $HALFLOAD
+    fi
     ;;
   "full")
-    echo $FULLLOAD
+    if [ ! -z $USE_INSTANCE_TYPE ] ; then
+     	echo $FULLLOADINSTANCE
+    else
+		echo $FULLLOAD
+    fi
     ;;
   "avg")
-    echo $AVERAGELOAD
+    if [ ! -z $USE_INSTANCE_TYPE ] ; then
+     	echo $AVERAGELOADINSTANCE
+    else
+		echo $AVERAGELOAD
+    fi
     ;;
   "platform")
     echo $PLATFORM
