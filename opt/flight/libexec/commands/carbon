@@ -12,6 +12,29 @@ LOG_DIR="$flight_ROOT/var/log/carbon"
 GATHER_COMMAND="flight gather"
 BOAVIZTA_URL="https://api.boavizta.org"
 
+case $action in
+  help|hel|he|h|--help|-h|"")
+    cat <<EOF
+  SYNOPSIS:
+
+    $flight_NAME carbon <data>
+
+  DESCRIPTION:
+
+    Get carbon emission data for your node.
+
+  COMMANDS:
+
+    half    Show carbon emissions for node at 50% load
+    full    Show carbon emissions for node at 100% load
+    min     Show carbon emissions for node at 0% load
+    avg     Show carbon emissions for node at average load from past 15 minutes
+    report  Show detailed report for all carbon emission data
+
+EOF
+  exit 0
+esac
+
 # Exit if no jq
 if ! which jq >/dev/null 2>&1 ; then
     echo "Can't find command 'jq', this is required for program to function"
@@ -445,26 +468,6 @@ EOF
 }
 
 case $action in
-  help|hel|he|h|--help|-h)
-    cat <<EOF
-  SYNOPSIS:
-
-    $flight_NAME carbon <data>
-
-  DESCRIPTION:
-
-    Get carbon emission data for your node.
-
-  COMMANDS:
-
-    half    Show carbon emissions for node at 50% load
-    full    Show carbon emissions for node at 100% load
-    min     Show carbon emissions for node at 0% load
-    avg     Show carbon emissions for node at average load from past 15 minutes
-    report  Show detailed report for all carbon emission data
-
-EOF
-    ;;
   "min")
     if [ ! -z $USE_INSTANCE_TYPE ] ; then
      	echo $NOLOADINSTANCE
