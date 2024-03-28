@@ -348,7 +348,7 @@ Disks: $(echo "$DISKSINFO" |sed 's/, $//g')
 
 ## Platform & Power Information
 
-Platform: $CLOUD_PLATFORM
+Platform: $CLOUD_PROVIDER
 Location: $LOCATION
 
 #
@@ -423,7 +423,7 @@ Disks: $(echo "$DISKSINFO" |sed 's/, $//g')
 
 ## Platform & Power Information
 
-Platform: $CLOUD_PLATFORM
+Platform: $CLOUD_PROVIDER
 
 Location: $LOCATION
 
@@ -443,7 +443,7 @@ EOF
     cat << EOF >> $LOG_DIR/report.md
 
 ## Estimated Carbon Consumption (From Instance Type)
-### Detected instance type is '${INSTANCE_TYPE}' on ${CLOUD_PLATFORM}
+### Detected instance type is '${INSTANCE_TYPE}' on ${CLOUD_PROVIDER}
 
 No Load: ${NOLOADINSTANCE}kgCO2eq/hr
 
@@ -498,7 +498,7 @@ case $action in
     fi
     ;;
   "platform")
-    echo $PLATFORM
+    echo $CLOUD_PROVIDER
     ;;
   "instance-type")
     echo $INSTANCE_TYPE
