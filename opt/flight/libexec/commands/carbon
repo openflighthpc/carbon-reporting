@@ -75,22 +75,23 @@ fi
 # - Number of GPUs - Not yet supported in Boavizta
 
 PLATFORM=$($GATHER_COMMAND show .platform --force)
+case $PLATFORM in
+  "AWS")
+    CLOUD_PROVIDER=aws
+    ;;
+  "OpenStack")
+    CLOUD_PROVIDER=alces
+    ;;
+esac
 
 ## Determine cloud instance and provider
-CLOUD_PROVIDER=aws
 INSTANCE_TYPE=$(curl -s --fail http://169.254.169.254/latest/meta-data/instance-type)
-PROVIDERS=$(echo $(curl -s -X 'GET' \
-  "${BOAVIZTA_URL}/v1/cloud/instance/all_providers" \
-  -H 'accept: application/json') | jq .[] | tr -d '"')
-for provider in $PROVIDERS ; do
-	ARCHETYPES=$(curl -s -X 'GET' \
-	  "${BOAVIZTA_URL}/v1/cloud/instance/all_instances?provider=${provider}" \
-	  -H 'accept: application/json')
-	if echo $ARCHETYPES | jq -e ".|any(. == \"$INSTANCE_TYPE\")" &> /dev/null ; then
-		CLOUD_PROVIDER=$provider
-		USE_INSTANCE_TYPE=true
-	fi
-done
+ARCHETYPES=$(curl -s -X 'GET' \
+  "${BOAVIZTA_URL}/v1/cloud/instance/all_instances?provider=${CLOUD_PROVIDER}" \
+  -H 'accept: application/json')
+if echo $ARCHETYPES | jq -e ".|any(. == \"$INSTANCE_TYPE\")" &> /dev/null ; then
+	USE_INSTANCE_TYPE=true
+fi
 
 ## Figure system info out
 # Grab some data from gather
@@ -347,7 +348,7 @@ Disks: $(echo "$DISKSINFO" |sed 's/, $//g')
 
 ## Platform & Power Information
 
-Platform: $PLATFORM
+Platform: $CLOUD_PLATFORM
 Location: $LOCATION
 
 #
@@ -422,7 +423,7 @@ Disks: $(echo "$DISKSINFO" |sed 's/, $//g')
 
 ## Platform & Power Information
 
-Platform: $PLATFORM
+Platform: $CLOUD_PLATFORM
 
 Location: $LOCATION
 
@@ -442,7 +443,7 @@ EOF
     cat << EOF >> $LOG_DIR/report.md
 
 ## Estimated Carbon Consumption (From Instance Type)
-### Detected instance type is '${INSTANCE_TYPE}' on ${PLATFORM}
+### Detected instance type is '${INSTANCE_TYPE}' on ${CLOUD_PLATFORM}
 
 No Load: ${NOLOADINSTANCE}kgCO2eq/hr
 
